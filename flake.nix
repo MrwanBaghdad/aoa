@@ -46,6 +46,11 @@
           shellHook = ''
             export GOPATH="$HOME/go"
             export PATH="$GOPATH/bin:$PATH"
+            if ! command -v container &>/dev/null; then
+              echo "error: apple/container is not installed — aoa requires it to run VMs."
+              echo "       Install from: https://github.com/apple/container/releases"
+              exit 1
+            fi
             echo "aoa dev shell — go $(go version | awk '{print $3}')"
           '';
         };
