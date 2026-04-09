@@ -36,14 +36,20 @@ The VM starts with a clean environment. The host environment is **never** inheri
 
 | What the agent can see | What it cannot see |
 |------------------------|-------------------|
-| `ANTHROPIC_API_KEY` (explicitly injected) | All other host env vars |
+| `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` (one injected token only) | All other host env vars |
 | `/workspace` (project directory) | `~/.ssh/` |
 | `/run/secrets/` (as_path tmpfiles) | `~/.aws/`, `~/.config/gcloud/` |
 | — | `~/.gitconfig` credentials |
 | — | Host `.env` files |
-| — | macOS Keychain |
+| — | macOS Keychain (raw access) |
 
-The only secrets that enter the VM are those you explicitly declare — either in `env_keys` in your config or in `secretspec.toml`.
+The only secrets that enter the VM are those explicitly resolved by `aoa` — from `secretspec.toml`, declared env vars, or the single OAuth token extracted from the Keychain. The Keychain itself is never mounted or accessible inside the VM; only the resolved token value is injected.
+
+**Auth resolution order:**
+
+1. `secretspec.toml` in the project directory (multi-provider: 1Password, Vault, dotenv)
+2. Env vars listed in `~/.config/aoa/config.toml` (`ANTHROPIC_API_KEY`, etc.)
+3. macOS Keychain fallback — reads `claudeAiOauth.accessToken` from the `Claude Code-credentials` entry, injects it as `CLAUDE_CODE_OAUTH_TOKEN`
 
 **Secrets lifecycle:**
 

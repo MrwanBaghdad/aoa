@@ -14,7 +14,7 @@ Running agents in YOLO mode (full autonomy, no permission prompts) on bare metal
 
 | Tool | Isolation | macOS Native | Secrets | Open Source | Interactive Agent UX |
 |------|-----------|-------------|---------|-------------|---------------------|
-| **aoa** | VM (Virtualization.framework) | Yes | SecretSpec + env | Yes | Yes |
+| **aoa** | VM (Virtualization.framework) | Yes | Keychain + SecretSpec + env | Yes | Yes |
 | COI | Container (shared kernel) | Via Lima VM | Env vars only | Yes | Best in class |
 | Docker sbx | MicroVM (libkrun) | Yes | Credential proxy | No | Built-in |
 | E2B | MicroVM (Firecracker) | Cloud only | Env vars | Yes | SDK-based |
@@ -76,7 +76,7 @@ aoa shell --network open
 ```
 
 When `aoa shell` starts, it:
-1. Resolves your secrets (from `secretspec.toml` or env vars)
+1. Resolves credentials (see [Auth resolution order](#auth-resolution-order) below)
 2. Writes them to a `0600` tmpfile
 3. Spins up a VM with your project mounted at `/workspace`
 4. Locks down network egress (blocks private networks and cloud metadata endpoints)
@@ -88,9 +88,36 @@ When `aoa shell` starts, it:
 
 ## Secret management
 
-### Simple: environment variables
+### Auth resolution order
 
-By default `aoa` injects the keys listed in `~/.config/aoa/config.toml`:
+`aoa` tries credential sources in order, using the first that provides an LLM token:
+
+1. **`secretspec.toml`** in your project directory (team vaults, 1Password, HashiCorp Vault)
+2. **Env vars** listed in `~/.config/aoa/config.toml` (e.g. `ANTHROPIC_API_KEY` if already exported)
+3. **macOS Keychain** — reads the OAuth token that Claude Code stores when you run `claude login`
+
+This means **`aoa shell` works with zero configuration** if you've already authenticated with `claude` on your machine. No token generation, no copy-pasting keys.
+
+```
+$ aoa shell .
+Auth: using Claude credentials from macOS Keychain
+Starting aoa session a1b2c3d4 (slot 1) in ~/myproject
+```
+
+### Zero-config: already using Claude Code
+
+If you use `claude` on your machine, you're done. `aoa` reads the same credentials from the Keychain (service: `Claude Code-credentials`) that Claude Code uses. The OAuth token is injected into the VM as `CLAUDE_CODE_OAUTH_TOKEN`.
+
+### Explicit: environment variables
+
+To use an API key directly, set it in your shell and it will be picked up:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+aoa shell .
+```
+
+Or declare which keys to inject in `~/.config/aoa/config.toml`:
 
 ```toml
 [secrets]
@@ -101,7 +128,7 @@ Only those specific keys are injected — nothing else from your host environmen
 
 ### Declarative: secretspec.toml
 
-For team projects, add a `secretspec.toml` to your repo root. `aoa` auto-detects it:
+For team projects, add a `secretspec.toml` to your repo root. `aoa` auto-detects it and uses it instead of the default resolution:
 
 ```toml
 [project]
@@ -124,7 +151,7 @@ as_path = true
 
 With `as_path = true`, the secret value is written to a tmpfile and its path is injected into the container — the plaintext value never appears in the process environment.
 
-If the [SecretSpec CLI](https://github.com/cachix/secretspec) is installed, it resolves secrets from 1Password, macOS Keychain, HashiCorp Vault, or dotenv files according to your provider configuration. Without it, `aoa` falls back to env vars and declared defaults.
+If the [SecretSpec CLI](https://github.com/cachix/secretspec) is installed, it resolves secrets from 1Password, macOS Keychain, HashiCorp Vault, or dotenv files. Without it, `aoa` falls back to env vars and declared defaults.
 
 ---
 
