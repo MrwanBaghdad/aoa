@@ -61,8 +61,12 @@ func TestGetMissingSessionReturnsError(t *testing.T) {
 
 func TestListSessions(t *testing.T) {
 	m := newTestManager(t)
-	m.Create(1, "/tmp/ws", "img:latest", false)
-	m.Create(2, "/tmp/ws", "img:latest", false)
+	if _, err := m.Create(1, "/tmp/ws", "img:latest", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Create(2, "/tmp/ws", "img:latest", false); err != nil {
+		t.Fatal(err)
+	}
 
 	sessions, err := m.List()
 	if err != nil {
@@ -125,7 +129,9 @@ func TestNextSlot(t *testing.T) {
 		t.Errorf("first slot should be 1, got %d", slot)
 	}
 
-	m.Create(1, ws, "img:latest", false)
+	if _, err := m.Create(1, ws, "img:latest", false); err != nil {
+		t.Fatal(err)
+	}
 	slot2, _ := m.NextSlot(ws)
 	if slot2 != 2 {
 		t.Errorf("second slot should be 2, got %d", slot2)
@@ -136,8 +142,12 @@ func TestNextSlotSkipsUsed(t *testing.T) {
 	m := newTestManager(t)
 	ws := "/tmp/slot-skip-ws"
 	// Use slots 1 and 2
-	m.Create(1, ws, "img:latest", false)
-	m.Create(2, ws, "img:latest", false)
+	if _, err := m.Create(1, ws, "img:latest", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Create(2, ws, "img:latest", false); err != nil {
+		t.Fatal(err)
+	}
 	slot, _ := m.NextSlot(ws)
 	if slot != 3 {
 		t.Errorf("expected slot 3, got %d", slot)
@@ -171,7 +181,9 @@ func TestFindBySlotIgnoresStopped(t *testing.T) {
 	ws := "/tmp/stopped-ws"
 	s, _ := m.Create(1, ws, "img:latest", false)
 	s.Status = StatusStopped
-	m.Update(s)
+	if err := m.Update(s); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := m.FindBySlot(1, ws)
 	if err == nil {

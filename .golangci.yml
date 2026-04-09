@@ -1,0 +1,41 @@
+version: "2"
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - ineffassign
+    - unused
+    - gosec
+    - gocritic
+    - misspell
+
+  settings:
+    gosec:
+      excludes:
+        - G104  # errors unhandled — covered by errcheck exclude-functions below
+        - G204  # subprocess via variable — intentional (container/tmux/security CLI wrappers)
+        - G304  # file path via variable — intentional (audit logs, session state, secret tmpfiles)
+        - G101  # hardcoded credentials — false positives in test fixtures
+        - G115  # integer overflow uintptr->int — safe on darwin amd64+arm64
+
+    errcheck:
+      exclude-functions:
+        # Cleanup helpers: Close/Remove/Chmod/WriteString failures in error
+        # paths can't be meaningfully handled and would obscure the real error.
+        - (*os.File).Close
+        - (*os.File).WriteString
+        - os.Remove
+        - os.Chmod
+        - os.Unsetenv
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+issues:
+  exclude-rules:
+    # Test helpers: session Create/Update errors are asserted via test assertions
+    - linters: [errcheck]
+      path: "_test.go"
+  max-issues-per-linter: 0
+  max-same-issues: 0

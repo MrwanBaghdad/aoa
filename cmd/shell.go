@@ -178,14 +178,18 @@ func runShell(cmd *cobra.Command, args []string) error {
 	}
 
 	s.ContainerID = containerName
-	mgr.Update(s)
+	if err := mgr.Update(s); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not persist session state: %v\n", err)
+	}
 
 	// Run the container (blocks until exit)
 	runErr := rt.Run(opts)
 
 	// Mark session stopped
 	s.Status = session.StatusStopped
-	mgr.Update(s)
+	if err := mgr.Update(s); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not persist session state: %v\n", err)
+	}
 
 	if runErr != nil {
 		// Exit codes from the container are normal — don't treat as error

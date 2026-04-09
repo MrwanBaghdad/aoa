@@ -29,6 +29,9 @@ test-coverage:
 lint:
 	golangci-lint run ./...
 
+vuln:
+	govulncheck ./...
+
 # ---------------------------------------------------------------------------
 # Python integration tests
 # ---------------------------------------------------------------------------
@@ -72,7 +75,7 @@ lint-python:
 # ---------------------------------------------------------------------------
 
 # Run everything: build, Go tests, CLI integration tests
-ci: build test-race integrations-cli
+ci: build test-race lint vuln integrations-cli
 
 clean:
 	rm -f $(BINARY) coverage.out coverage.html

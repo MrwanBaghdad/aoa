@@ -35,17 +35,21 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tSLOT\tSTATUS\tIMAGE\tWORKSPACE\tAGE")
+	if _, err := fmt.Fprintln(w, "ID\tSLOT\tSTATUS\tIMAGE\tWORKSPACE\tAGE"); err != nil {
+		return err
+	}
 	for _, s := range sessions {
 		age := time.Since(s.CreatedAt).Round(time.Second)
-		fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\n",
+		if _, err := fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\n",
 			s.ID[:8],
 			s.Slot,
 			s.Status,
 			s.Image,
 			truncate(s.WorkspaceDir, 40),
 			age,
-		)
+		); err != nil {
+			return err
+		}
 	}
 	return w.Flush()
 }

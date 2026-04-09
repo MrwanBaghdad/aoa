@@ -98,7 +98,7 @@ $IPT -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 `)
 	for _, entry := range allowlist {
-		b.WriteString(fmt.Sprintf("$IPT -A OUTPUT -d %s -j ACCEPT\n", entry))
+		fmt.Fprintf(&b, "$IPT -A OUTPUT -d %s -j ACCEPT\n", entry)
 	}
 	b.WriteString("\necho 'Network: allowlist'\n")
 	return b.String()

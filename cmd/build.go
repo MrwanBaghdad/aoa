@@ -52,7 +52,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 	// Verify the Dockerfile exists
 	if _, err := os.Stat(dockerfile); err != nil {
-		return fmt.Errorf("Dockerfile not found at %s — are you running from the aoa repo root?", dockerfile)
+		return fmt.Errorf("dockerfile not found at %s — are you running from the aoa repo root?", dockerfile)
 	}
 
 	// Default tag based on target
