@@ -1,0 +1,3 @@
+# Tests to skip temporarily. One nodeid per line. Lines starting with # are comments.
+# Example:
+# tests/shell/test_persistent.py::test_something_broken

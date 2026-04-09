@@ -28,7 +28,8 @@ func runHealth(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Println("=== aoa health check ===\n")
+	fmt.Println("=== aoa health check ===")
+	fmt.Println()
 
 	fmt.Println("Dependencies:")
 	check("apple/container", "container runtime", func() error {
