@@ -76,3 +76,24 @@ ci: build test-race integrations-cli
 
 clean:
 	rm -f $(BINARY) coverage.out coverage.html
+
+# ---------------------------------------------------------------------------
+# Release / packaging
+# ---------------------------------------------------------------------------
+
+# Usage: make formula VERSION=0.1.0
+# Fetches the release tarball, computes sha256, updates Formula/aoa.rb.
+# Copy the result to your homebrew-tap repo before pushing.
+formula:
+	@test -n "$(VERSION)" || (echo "usage: make formula VERSION=x.y.z" && exit 1)
+	@URL="https://github.com/marwan/aoa/archive/refs/tags/v$(VERSION).tar.gz"; \
+	 SHA=$$(curl -sL "$$URL" | shasum -a 256 | awk '{print $$1}'); \
+	 sed -i '' \
+	     -e "s|url \".*\"|url \"$$URL\"|" \
+	     -e "s|sha256 \".*\"|sha256 \"$$SHA\"|" \
+	     Formula/aoa.rb; \
+	 echo "Formula/aoa.rb updated for v$(VERSION) (sha256=$$SHA)"
+
+# Verify the Nix flake builds (requires Nix with flakes enabled)
+nix-build:
+	nix build .#
