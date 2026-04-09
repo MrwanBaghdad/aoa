@@ -252,13 +252,15 @@ func resolveSecrets(cfg *config.Config, projectDir string) (*secrets.Bundle, err
 func agentCommand(agent string) []string {
 	switch agent {
 	case "claude":
-		return []string{"/bin/bash", "-c", "cd /workspace && claude --dangerously-skip-permissions"}
+		// --dangerously-skip-permissions: run without per-operation prompts
+		// The VM sandbox provides the safety boundary instead.
+		return []string{"claude", "--dangerously-skip-permissions"}
 	case "opencode":
-		return []string{"/bin/bash", "-c", "cd /workspace && opencode"}
+		return []string{"opencode"}
 	case "bash":
 		return []string{"/bin/bash"}
 	default:
-		return []string{"/bin/bash", "-c", fmt.Sprintf("cd /workspace && %s", agent)}
+		return []string{"/bin/bash", "-c", agent}
 	}
 }
 

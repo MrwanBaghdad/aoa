@@ -68,6 +68,8 @@ RUN chmod +x /usr/local/bin/aoa-test-security
 
 WORKDIR /workspace
 
-# systemd as PID 1 for persistent containers; override with --entrypoint for interactive use
-ENTRYPOINT ["/lib/systemd/systemd"]
-STOPSIGNAL SIGRTMIN+3
+# aoa-entrypoint applies network policy then exec's the given command.
+# Default command is bash — override at runtime for the agent:
+#   container run aoa-agent:latest claude --dangerously-skip-permissions
+ENTRYPOINT ["/usr/local/bin/aoa-entrypoint"]
+CMD ["/bin/bash"]
