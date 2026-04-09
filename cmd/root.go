@@ -12,12 +12,13 @@ const version = "0.1.0"
 var cfgFile string
 
 var rootCmd = &cobra.Command{
-	Use:   "aoa",
-	Short: "Agent on apple/container — secure AI coding agent sandbox for macOS",
+	Use:          "aoa",
+	Short:        "Agent on apple/container — secure AI coding agent sandbox for macOS",
 	Long: `aoa runs AI coding agents (Claude Code, opencode, Aider) in isolated VMs
 using apple/container (Virtualization.framework). Each agent gets hardware-level
 isolation with controlled secrets injection and network egress filtering.`,
-	Version: version,
+	Version:      version,
+	SilenceUsage: true,
 }
 
 func Execute() {

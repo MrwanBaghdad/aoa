@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"golang.org/x/term"
+
 	"github.com/spf13/cobra"
 
 	"github.com/marwan/aoa/internal/config"
@@ -158,13 +160,15 @@ func runShell(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Starting aoa session %s (slot %d) in %s\n", s.ID[:8], slot, projectDir)
 	fmt.Printf("Image: %s | Network: %s | Agent: %s\n", cfg.Sandbox.Image, cfg.Network.Mode, shellAgent)
 
+	isTTY := term.IsTerminal(int(os.Stdin.Fd()))
+
 	opts := container.RunOptions{
 		Name:        containerName,
 		Image:       cfg.Sandbox.Image,
 		Volumes:     volumes,
 		EnvFiles:    []string{bundle.EnvFile},
 		Interactive: true,
-		TTY:         true,
+		TTY:         isTTY,
 		Remove:      !cfg.Sandbox.Persistent,
 		Env: []string{
 			fmt.Sprintf("AOA_NETWORK_MODE=%s", cfg.Network.Mode),
@@ -209,7 +213,7 @@ func resolveProjectDir(args []string) (string, error) {
 }
 
 func resolveSecrets(cfg *config.Config, projectDir string) (*secrets.Bundle, error) {
-	// Check for secretspec.toml in project dir
+	// 1. Project-level secretspec.toml takes priority.
 	specPath := filepath.Join(projectDir, "secretspec.toml")
 	if _, err := os.Stat(specPath); err == nil {
 		spec, err := secrets.LoadSecretSpec(projectDir)
@@ -223,8 +227,26 @@ func resolveSecrets(cfg *config.Config, projectDir string) (*secrets.Bundle, err
 		return bundle, nil
 	}
 
-	// Fallback: inject env vars listed in config
-	return secrets.FromEnv(cfg.Secrets.EnvKeys)
+	// 2. Explicit env vars from config (e.g. ANTHROPIC_API_KEY set in shell).
+	bundle, err := secrets.FromEnv(cfg.Secrets.EnvKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. If no LLM auth token ended up in the bundle, fall back to
+	//    the Claude Code credentials already stored in the macOS Keychain.
+	//    This means `aoa shell` just works if you've already run `claude login`.
+	if !bundle.HasLLMAuth() {
+		if keychainBundle, err := secrets.FromClaudeKeychain(); err == nil {
+			bundle.Cleanup()
+			fmt.Println("Auth: using Claude credentials from macOS Keychain")
+			return keychainBundle, nil
+		}
+		// Nothing worked — tell the user what to do.
+		fmt.Fprintln(os.Stderr, "warning: no LLM credentials found — set ANTHROPIC_API_KEY, or log in with `claude`")
+	}
+
+	return bundle, nil
 }
 
 func agentCommand(agent string) []string {
