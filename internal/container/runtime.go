@@ -89,7 +89,19 @@ func (r *Runtime) Remove(containerID string) error {
 
 // Build runs `container build`.
 func (r *Runtime) Build(dockerfile, tag, contextDir string) error {
-	args := []string{"build", "-f", dockerfile, "-t", tag, contextDir}
+	return r.BuildWithTarget(dockerfile, tag, "", contextDir, false)
+}
+
+// BuildWithTarget runs `container build` with an optional --target stage and --no-cache.
+func (r *Runtime) BuildWithTarget(dockerfile, tag, target, contextDir string, noCache bool) error {
+	args := []string{"build", "-f", dockerfile, "-t", tag}
+	if target != "" {
+		args = append(args, "--target", target)
+	}
+	if noCache {
+		args = append(args, "--no-cache")
+	}
+	args = append(args, contextDir)
 	cmd := exec.Command(r.binary, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

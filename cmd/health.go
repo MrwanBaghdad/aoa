@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/marwan/aoa/internal/container"
+	"github.com/marwan/aoa/internal/secrets"
 )
 
 var healthCmd = &cobra.Command{
@@ -60,12 +61,21 @@ func runHealth(cmd *cobra.Command, args []string) error {
 		return err
 	})
 
-	fmt.Println("\nEnvironment:")
-	required("ANTHROPIC_API_KEY", "LLM API key present", func() error {
-		if v := os.Getenv("ANTHROPIC_API_KEY"); v == "" {
-			return fmt.Errorf("not set — export ANTHROPIC_API_KEY=sk-ant-...")
+	fmt.Println("\nAuth:")
+	required("LLM credentials", "API key or Claude login", func() error {
+		// Accept any of: ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, or Keychain
+		for _, key := range []string{"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN"} {
+			if os.Getenv(key) != "" {
+				fmt.Printf("        (via %s)\n", key)
+				return nil
+			}
 		}
-		return nil
+		if token, err := secrets.ClaudeOAuthToken(); err == nil && token != "" {
+			fmt.Printf("        (via macOS Keychain — Claude Code login)\n")
+			return nil
+		}
+		return fmt.Errorf("no credentials found\n" +
+			"        set ANTHROPIC_API_KEY, or log in with `claude`")
 	})
 
 	fmt.Println("\nImages:")
