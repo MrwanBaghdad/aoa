@@ -109,7 +109,7 @@ def aoa_output(args: list[str], **kwargs) -> str:
 def make_workspace(tmp_path: Path, *, git: bool = False) -> Path:
     """Create a minimal workspace directory for testing."""
     ws = tmp_path / "workspace"
-    ws.mkdir()
+    ws.mkdir(exist_ok=True)
     (ws / "hello.py").write_text('print("hello from sandbox")\n')
     if git:
         subprocess.run(["git", "init", str(ws)], check=True, capture_output=True)

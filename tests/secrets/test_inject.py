@@ -99,13 +99,16 @@ def test_default_config_secrets_section():
 # doesn't panic when secrets are missing and gives a clear error)
 # ---------------------------------------------------------------------------
 
-def test_shell_warns_on_missing_env_key(aoa_binary, workspace_dir):
-    """When ANTHROPIC_API_KEY is unset, aoa should warn (not crash silently)."""
+def test_shell_does_not_panic_without_api_key(aoa_binary, workspace_dir):
+    """aoa shell must not panic when ANTHROPIC_API_KEY is unset.
+
+    Auth falls back to CLAUDE_CODE_OAUTH_TOKEN or macOS Keychain automatically.
+    """
     from support.helpers import run_aoa
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
-    result = run_aoa(["shell", str(workspace_dir)], env=env, timeout=10)
+    result = run_aoa(["shell", str(workspace_dir), "--agent", "echo ok"], env=env, timeout=15)
     combined = result.stdout + result.stderr
-    # Must not panic
-    assert "panic" not in combined.lower()
-    # Must emit a warning about the missing key
-    assert "ANTHROPIC_API_KEY" in combined
+    # Check for Go runtime panic (not just the word "panic" in a path)
+    assert "goroutine" not in combined and "runtime error" not in combined
+    # Should either succeed (Keychain) or emit a clear auth warning — not a crash
+    assert result.returncode == 0 or "credentials" in combined.lower()

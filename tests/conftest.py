@@ -57,10 +57,22 @@ def git_workspace(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def clean_test_sessions(workspace_dir: Path) -> Generator:
+def clean_test_sessions(tmp_path: Path) -> Generator:
     """Remove session state created during a test."""
     yield
-    cleanup_sessions(str(workspace_dir))
+    # Clean up sessions for any workspace under this test's tmp_path
+    session_dir = get_session_dir()
+    if not session_dir.exists():
+        return
+    import json
+    for f in session_dir.glob("*.json"):
+        try:
+            data = json.loads(f.read_text())
+            ws = data.get("workspace_dir", "")
+            if ws and str(tmp_path) in ws:
+                f.unlink(missing_ok=True)
+        except (json.JSONDecodeError, KeyError):
+            pass
 
 
 # ---------------------------------------------------------------------------
