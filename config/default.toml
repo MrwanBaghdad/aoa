@@ -36,4 +36,4 @@ mode = "restricted"
 provider = "env"
 
 # Environment variables to inject from host (env provider)
-env_keys = ["ANTHROPIC_API_KEY", "GITHUB_TOKEN"]
+env_keys = ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN", "GITHUB_TOKEN"]

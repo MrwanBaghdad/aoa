@@ -48,7 +48,7 @@ func DefaultConfig() *Config {
 		},
 		Secrets: SecretsConfig{
 			Provider: "env",
-			EnvKeys:  []string{"ANTHROPIC_API_KEY"},
+			EnvKeys:  []string{"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN", "GITHUB_TOKEN"},
 		},
 	}
 }
