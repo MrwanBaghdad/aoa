@@ -1,0 +1,39 @@
+# aoa default configuration
+# Place at ~/.config/aoa/config.toml or pass via --config flag
+
+[sandbox]
+# Container image to use for agent sessions
+image = "aoa-agent:latest"
+
+# Where to mount the project directory inside the container
+workspace_dir = "/workspace"
+
+# Keep container alive after session exit (useful for caching installed tools)
+persistent = false
+
+# Maximum parallel sessions (slots) per workspace
+max_slots = 10
+
+# Extra volumes to mount in every session (host:container[:ro])
+# extra_volumes = ["/path/to/tools:/tools:ro"]
+
+
+[network]
+# Egress filtering mode: restricted | allowlist | open
+#   restricted — block private networks, allow internet HTTPS/DNS (default)
+#   allowlist  — only allow specified IPs/CIDRs
+#   open       — no restrictions (not recommended)
+mode = "restricted"
+
+# For allowlist mode: allowed IPs or CIDRs
+# allowlist = ["203.0.113.0/24", "8.8.8.8"]
+
+
+[secrets]
+# Secret provider: env | secretspec
+#   env        — read secrets from host environment variables (default)
+#   secretspec — use secretspec.toml in project directory
+provider = "env"
+
+# Environment variables to inject from host (env provider)
+env_keys = ["ANTHROPIC_API_KEY", "GITHUB_TOKEN"]

@@ -1,0 +1,28 @@
+# aoa-agent — extends base with Claude Code and the aoa entrypoint
+FROM aoa-base:latest
+
+# Install Node.js LTS (for Claude Code) via NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Install opencode (alternative agent — optional, skip if not needed)
+# RUN npm install -g opencode-ai
+
+# Copy the network lockdown + agent entrypoint script
+COPY scripts/entrypoint.sh /usr/local/bin/aoa-entrypoint
+RUN chmod +x /usr/local/bin/aoa-entrypoint
+
+# Install the security test suite
+COPY scripts/test-security.sh /usr/local/bin/aoa-test-security
+RUN chmod +x /usr/local/bin/aoa-test-security
+
+# For interactive agent use (not systemd), override entrypoint at runtime:
+#   container run -it --entrypoint /usr/local/bin/aoa-entrypoint aoa-agent
+#
+# For systemd-based persistent containers, use default entrypoint and exec in.
+
+WORKDIR /workspace
