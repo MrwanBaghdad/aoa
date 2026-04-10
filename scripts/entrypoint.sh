@@ -56,6 +56,25 @@ apply_network_policy() {
 # Apply network policy (requires root — apple/container runs as root by default)
 if [ "$(id -u)" = "0" ]; then
     apply_network_policy
+
+    # --allow-host: punch a hole to the host machine's gateway IP.
+    # Inserted at position 1 so it takes priority over private-network DROP rules.
+    if [ "${AOA_ALLOW_HOST:-0}" = "1" ]; then
+        GATEWAY=$(ip route show default 2>/dev/null | awk '/default/ {print $3; exit}')
+        if [ -n "$GATEWAY" ]; then
+            if [ -n "${AOA_ALLOW_HOST_PORTS:-}" ]; then
+                echo "$AOA_ALLOW_HOST_PORTS" | tr ',' '\n' | while read -r port; do
+                    [ -n "$port" ] && $IPT -I OUTPUT 1 -d "$GATEWAY" -p tcp --dport "$port" -j ACCEPT
+                done
+                echo "[aoa] Host access: $GATEWAY ports $AOA_ALLOW_HOST_PORTS"
+            else
+                $IPT -I OUTPUT 1 -d "$GATEWAY" -j ACCEPT
+                echo "[aoa] Host access: $GATEWAY (all ports)"
+            fi
+        else
+            echo "[aoa] Warning: --allow-host set but could not detect gateway IP"
+        fi
+    fi
 else
     echo "[aoa] Warning: not running as root, skipping network policy"
 fi

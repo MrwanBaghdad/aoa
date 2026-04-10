@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"golang.org/x/term"
@@ -19,12 +20,14 @@ import (
 )
 
 var (
-	shellSlot       int
-	shellResume     bool
-	shellPersistent bool
-	shellImage      string
-	shellNetwork    string
-	shellAgent      string
+	shellSlot          int
+	shellResume        bool
+	shellPersistent    bool
+	shellImage         string
+	shellNetwork       string
+	shellAgent         string
+	shellAllowHost     bool
+	shellAllowHostPort []string
 )
 
 var shellCmd = &cobra.Command{
@@ -55,6 +58,8 @@ func init() {
 	shellCmd.Flags().StringVar(&shellImage, "image", "", "override container image")
 	shellCmd.Flags().StringVar(&shellNetwork, "network", "", "network mode: restricted|allowlist|open (overrides config)")
 	shellCmd.Flags().StringVar(&shellAgent, "agent", "claude", "agent to launch: claude|opencode|bash")
+	shellCmd.Flags().BoolVar(&shellAllowHost, "allow-host", false, "allow agent to reach ports on the host machine (punches through restricted mode)")
+	shellCmd.Flags().StringArrayVar(&shellAllowHostPort, "allow-host-port", nil, "restrict host access to specific ports, e.g. --allow-host-port 5432 (repeatable)")
 }
 
 func runShell(cmd *cobra.Command, args []string) error {
@@ -170,10 +175,7 @@ func runShell(cmd *cobra.Command, args []string) error {
 		Interactive: true,
 		TTY:         isTTY,
 		Remove:      !cfg.Sandbox.Persistent,
-		Env: []string{
-			fmt.Sprintf("AOA_NETWORK_MODE=%s", cfg.Network.Mode),
-			fmt.Sprintf("AOA_SESSION_ID=%s", s.ID),
-		},
+		Env: buildEnv(cfg, s.ID),
 		Cmd: agentCmd,
 	}
 
@@ -251,6 +253,20 @@ func resolveSecrets(cfg *config.Config, projectDir string) (*secrets.Bundle, err
 	}
 
 	return bundle, nil
+}
+
+func buildEnv(cfg *config.Config, sessionID string) []string {
+	env := []string{
+		fmt.Sprintf("AOA_NETWORK_MODE=%s", cfg.Network.Mode),
+		fmt.Sprintf("AOA_SESSION_ID=%s", sessionID),
+	}
+	if shellAllowHost {
+		env = append(env, "AOA_ALLOW_HOST=1")
+		if len(shellAllowHostPort) > 0 {
+			env = append(env, fmt.Sprintf("AOA_ALLOW_HOST_PORTS=%s", strings.Join(shellAllowHostPort, ",")))
+		}
+	}
+	return env
 }
 
 func agentCommand(agent string) []string {
