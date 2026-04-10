@@ -38,13 +38,10 @@ Running agents in YOLO mode (full autonomy, no permission prompts) on bare metal
 
 ### Homebrew (recommended)
 
-The formula lives in this repo — no separate tap required. Install directly from the raw URL:
-
 ```bash
-brew install https://raw.githubusercontent.com/marwan/aoa/main/Formula/aoa.rb
+brew tap marwan/aoa https://github.com/marwan/aoa
+brew install marwan/aoa/aoa
 ```
-
-> **Note:** Homebrew requires formulas to live inside a registered tap to be managed with `brew upgrade`. The single-repo approach above works for installation but you'll need to re-run the command to update. A dedicated `homebrew-tap` repo is planned for a future release.
 
 ### Build from source
 
@@ -447,26 +444,6 @@ make integrations
 make ci
 ```
 
-### Formula testing
-
-The Homebrew formula is tested in CI on every push that touches Go source or `Formula/aoa.rb`. The workflow:
-
-1. Creates a tarball from the current commit (`git archive`)
-2. Creates a temporary local tap (`brew tap-new local/aoa`) — Homebrew no longer allows installing `.rb` files from arbitrary paths
-3. Patches the formula with the local tarball URL, its sha256, and an explicit `version "0.0.0-ci"` (Homebrew can't infer a version from a `file://` URL)
-4. Installs via `brew install --build-from-source local/aoa/aoa`
-5. Runs the formula's `test do` block and smoke-tests the binary
-
-To test the formula locally before pushing:
-
-```bash
-# Build and verify the binary directly
-go build -o aoa . && ./aoa health
-
-# Full formula install (requires a release tag for the real URL)
-# For local testing, use --HEAD:
-brew install --HEAD ./Formula/aoa.rb
-```
 
 ### Project layout
 

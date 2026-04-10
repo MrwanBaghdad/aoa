@@ -32,37 +32,27 @@ jobs:
       - name: Update Homebrew
         run: brew update
 
-      - name: Create source tarball from current commit
+      - name: Create source tarball and patch formula
         run: |
           git archive --format=tar.gz HEAD > /tmp/aoa-local.tar.gz
-          echo "SHA=$(shasum -a 256 /tmp/aoa-local.tar.gz | awk '{print $1}')" >> "$GITHUB_ENV"
-
-      - name: Create local tap and install formula
-        run: |
-          # Homebrew requires formulas to live inside a tap
-          brew tap-new local/aoa
-          TAP_DIR="$(brew --repository)/Library/Taps/local/homebrew-aoa/Formula"
-
-          # Patch URL + sha256 to point at the local tarball.
-          # Also inject an explicit version since Homebrew can't infer one
-          # from a file:// URL (no version in the filename).
-          sed \
+          SHA=$(shasum -a 256 /tmp/aoa-local.tar.gz | awk '{print $1}')
+          # Patch in place: point at the local tarball and inject an explicit
+          # version (Homebrew cannot infer one from a file:// URL)
+          sed -i.bak \
             -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"\n  version \"0.0.0-ci\"|" \
             -e "s|sha256 \".*\"|sha256 \"$SHA\"|" \
-            Formula/aoa.rb > "$TAP_DIR/aoa.rb"
+            Formula/aoa.rb
 
-          echo "--- patched formula ---"
-          head -12 "$TAP_DIR/aoa.rb"
-
-          brew install --build-from-source local/aoa/aoa
+      - name: Tap the local repo and install
+        run: |
+          brew tap marwan/aoa "$GITHUB_WORKSPACE"
+          brew install --build-from-source marwan/aoa/aoa
 
       - name: Run brew test
-        run: brew test local/aoa/aoa
+        run: brew test marwan/aoa/aoa
 
-      - name: Smoke test — help
-        run: aoa --help
-
-      - name: Smoke test — version commands exist
+      - name: Smoke tests
         run: |
-          aoa health  || true   # exits 1 when deps missing in CI — that's fine
+          aoa --help
+          aoa health || true   # exits 1 when apple/container not installed — expected in CI
           aoa list
