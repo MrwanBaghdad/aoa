@@ -32,10 +32,12 @@ linters:
         - fmt.Fprintf
         - fmt.Fprintln
 
+  exclusions:
+    rules:
+      # Test helpers: session Create/Update errors are asserted via test assertions
+      - linters: [errcheck]
+        path: "_test.go"
+
 issues:
-  exclude-rules:
-    # Test helpers: session Create/Update errors are asserted via test assertions
-    - linters: [errcheck]
-      path: "_test.go"
   max-issues-per-linter: 0
   max-same-issues: 0
