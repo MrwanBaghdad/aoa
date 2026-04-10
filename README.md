@@ -36,20 +36,22 @@ Running agents in YOLO mode (full autonomy, no permission prompts) on bare metal
 
 ## Installation
 
-### Homebrew (recommended)
-
-```bash
-brew tap marwan/aoa https://github.com/marwan/aoa
-brew install marwan/aoa/aoa
-```
-
 ### Build from source
 
 ```bash
-git clone https://github.com/marwan/aoa
+git clone https://github.com/MrwanBaghdad/aoa
 cd aoa
 go build -o aoa .
 sudo mv aoa /usr/local/bin/
+```
+
+### Homebrew
+
+Once a release is tagged, install via:
+
+```bash
+brew tap marwan/aoa https://github.com/MrwanBaghdad/aoa
+brew install marwan/aoa/aoa
 ```
 
 ### Build the agent image
