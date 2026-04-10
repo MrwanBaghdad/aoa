@@ -60,5 +60,12 @@ echo "--- Supply Chain Protection ---"
 test_case ".git/hooks read-only" "test -d /workspace/.git/hooks && touch /workspace/.git/hooks/test-write 2>/dev/null" "true"
 
 echo ""
+echo "--- Network Policy Immutability ---"
+test_case "Cannot flush iptables (CAP_NET_ADMIN dropped)" \
+    "iptables-legacy -F OUTPUT 2>/dev/null" "true"
+test_case "Cannot modify iptables rules" \
+    "iptables-legacy -A OUTPUT -j ACCEPT 2>/dev/null" "true"
+
+echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

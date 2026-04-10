@@ -347,7 +347,11 @@ PASS  DNS works
 --- Supply Chain Protection ---
 PASS  .git/hooks read-only (correctly blocked)
 
-=== Results: 15 passed, 0 failed ===
+--- Network Policy Immutability ---
+PASS  Cannot flush iptables (CAP_NET_ADMIN dropped) (correctly blocked)
+PASS  Cannot modify iptables rules (correctly blocked)
+
+=== Results: 17 passed, 0 failed ===
 ```
 
 ---

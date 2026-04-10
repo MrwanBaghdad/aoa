@@ -82,6 +82,9 @@ fi
 echo "[aoa] Session: ${AOA_SESSION_ID:-unknown}"
 echo "[aoa] Workspace: $(ls /workspace 2>/dev/null | head -5 | tr '\n' ' ')"
 
-# Hand off to the agent or shell
+# Drop CAP_NET_ADMIN and CAP_NET_RAW from the bounding set before exec'ing
+# the agent. Once removed from the bounding set, no process — including UID 0
+# — can regain these capabilities, so the agent cannot flush or modify the
+# iptables rules set above even if it runs arbitrary code as root.
 cd /workspace
-exec "$@"
+exec capsh --drop=cap_net_admin,cap_net_raw -- -c 'exec "$0" "$@"' "$@"
