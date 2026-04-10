@@ -36,6 +36,16 @@ Running agents in YOLO mode (full autonomy, no permission prompts) on bare metal
 
 ## Installation
 
+### Homebrew (recommended)
+
+The formula lives in this repo — no separate tap required. Install directly from the raw URL:
+
+```bash
+brew install https://raw.githubusercontent.com/marwan/aoa/main/Formula/aoa.rb
+```
+
+> **Note:** Homebrew requires formulas to live inside a registered tap to be managed with `brew upgrade`. The single-repo approach above works for installation but you'll need to re-run the command to update. A dedicated `homebrew-tap` repo is planned for a future release.
+
 ### Build from source
 
 ```bash
@@ -51,7 +61,7 @@ sudo mv aoa /usr/local/bin/
 aoa build
 ```
 
-This builds `aoa-agent:latest` using apple/container's BuildKit — an Ubuntu image with systemd, Claude Code, and the `aoa-entrypoint` script pre-installed.
+This builds `aoa-agent:latest` using apple/container's BuildKit — an Ubuntu image with Claude Code and the `aoa-entrypoint` script pre-installed.
 
 ---
 
@@ -194,6 +204,23 @@ No restrictions. Use for debugging or when the agent needs to reach internal ser
 ```bash
 aoa shell --network open
 ```
+
+### Reaching ports on your Mac (`--allow-host`)
+
+Each aoa session runs in a VM with its own network namespace. The host machine is accessible via the vmnet gateway IP, but `restricted` mode blocks it (along with all private ranges) to prevent lateral movement.
+
+Use `--allow-host` to punch a precise hole to your Mac without opening up the rest of the private network:
+
+```bash
+# Allow the agent to reach any port on your Mac
+aoa shell . --allow-host
+
+# Restrict to specific ports only (repeatable)
+aoa shell . --allow-host --allow-host-port 5432          # Postgres
+aoa shell . --allow-host --allow-host-port 5432 --allow-host-port 6379  # + Redis
+```
+
+The gateway IP is detected inside the VM at runtime via `ip route` — you don't need to know or hardcode it. The ACCEPT rule is inserted before the private-network DROP rules so it works regardless of which subnet vmnet assigns.
 
 > **Note:** `aoa` uses `iptables-legacy` inside the VM — not `nftables`. This is required because apple/container's default kernel does not include nftables modules.
 
@@ -404,14 +431,41 @@ go build -o aoa .
 # Go unit tests
 make test-race
 
+# Lint (golangci-lint)
+make lint
+
+# Vulnerability scan (govulncheck)
+make vuln
+
 # Python integration tests (CLI only, no container needed)
 make integrations-cli
 
 # All integration tests (requires apple/container)
 make integrations
 
-# Build + all fast tests
+# Build + all fast tests (lint + vuln included)
 make ci
+```
+
+### Formula testing
+
+The Homebrew formula is tested in CI on every push that touches Go source or `Formula/aoa.rb`. The workflow:
+
+1. Creates a tarball from the current commit (`git archive`)
+2. Creates a temporary local tap (`brew tap-new local/aoa`) — Homebrew no longer allows installing `.rb` files from arbitrary paths
+3. Patches the formula with the local tarball URL, its sha256, and an explicit `version "0.0.0-ci"` (Homebrew can't infer a version from a `file://` URL)
+4. Installs via `brew install --build-from-source local/aoa/aoa`
+5. Runs the formula's `test do` block and smoke-tests the binary
+
+To test the formula locally before pushing:
+
+```bash
+# Build and verify the binary directly
+go build -o aoa . && ./aoa health
+
+# Full formula install (requires a release tag for the real URL)
+# For local testing, use --HEAD:
+brew install --HEAD ./Formula/aoa.rb
 ```
 
 ### Project layout
