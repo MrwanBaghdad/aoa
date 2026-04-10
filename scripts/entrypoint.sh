@@ -82,9 +82,24 @@ fi
 echo "[aoa] Session: ${AOA_SESSION_ID:-unknown}"
 echo "[aoa] Workspace: $(ls /workspace 2>/dev/null | head -5 | tr '\n' ' ')"
 
-# Drop CAP_NET_ADMIN and CAP_NET_RAW from the bounding set before exec'ing
-# the agent. Once removed from the bounding set, no process — including UID 0
-# — can regain these capabilities, so the agent cannot flush or modify the
-# iptables rules set above even if it runs arbitrary code as root.
+# Align the agent user's UID/GID with the workspace mount owner so that files
+# created inside the VM appear correctly owned on the host filesystem.
+# Skip if workspace is root-owned (UID 0) — that's an unusual host config.
+WORKSPACE_UID=$(stat -c '%u' /workspace 2>/dev/null || echo 1000)
+WORKSPACE_GID=$(stat -c '%g' /workspace 2>/dev/null || echo 1000)
+if [ "$WORKSPACE_UID" != "0" ]; then
+    usermod -u "$WORKSPACE_UID" agent 2>/dev/null || true
+    groupmod -g "$WORKSPACE_GID" agent 2>/dev/null || true
+fi
+echo "[aoa] Agent: uid=$WORKSPACE_UID gid=$WORKSPACE_GID"
+
+# Drop CAP_NET_ADMIN and CAP_NET_RAW from the bounding set and switch to the
+# non-root agent user in one step. capsh applies capability changes first,
+# then switches uid/gid, then execs — so the agent process is non-root with
+# immutable network rules. Claude Code requires non-root to accept
+# --dangerously-skip-permissions.
 cd /workspace
-exec capsh --drop=cap_net_admin,cap_net_raw -- -c 'exec "$0" "$@"' "$@"
+exec capsh \
+    --drop=cap_net_admin,cap_net_raw \
+    --user=agent \
+    -- -c 'exec "$0" "$@"' "$@"

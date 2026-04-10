@@ -48,6 +48,11 @@ RUN systemctl mask \
 
 RUN mkdir -p /workspace
 
+# Create non-root agent user. UID is adjusted at runtime to match the
+# workspace mount owner (see entrypoint.sh) so the agent can write files
+# that appear correctly owned on the host filesystem.
+RUN useradd --create-home --shell /bin/bash agent
+
 # ── agent ─────────────────────────────────────────────────────────────────────
 FROM base AS agent
 

@@ -62,11 +62,11 @@ def test_workdir_is_workspace(workspace_dir):
     assert "/workspace" in result.stdout
 
 
-def test_runs_as_root(workspace_dir):
-    """Must run as root so iptables rules can be applied."""
+def test_runs_as_non_root(workspace_dir):
+    """Agent must run as non-root — Claude Code rejects --dangerously-skip-permissions as root."""
     result = shell_run(workspace_dir, "id -u")
     assert result.returncode == 0
-    assert result.stdout.strip().split()[-1] == "0"
+    assert result.stdout.strip().split()[-1] != "0", "Agent must not run as root (UID 0)"
 
 
 # ── workspace mount ───────────────────────────────────────────────────────────
