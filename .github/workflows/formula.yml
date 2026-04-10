@@ -30,22 +30,25 @@ jobs:
           git archive --format=tar.gz HEAD > /tmp/aoa-local.tar.gz
           echo "SHA=$(shasum -a 256 /tmp/aoa-local.tar.gz | awk '{print $1}')" >> "$GITHUB_ENV"
 
-      - name: Patch formula to use local tarball
+      - name: Create local tap and install formula
         run: |
-          cp Formula/aoa.rb /tmp/aoa-test.rb
-          # macOS sed requires an explicit backup extension with -i
-          sed -i.bak \
+          # Homebrew requires formulas to live inside a tap
+          brew tap-new local/aoa
+          TAP_DIR="$(brew --repository)/Library/Taps/local/homebrew-aoa/Formula"
+
+          # Patch URL + sha256 to point at the local tarball
+          sed \
             -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"|" \
             -e "s|sha256 \".*\"|sha256 \"$SHA\"|" \
-            /tmp/aoa-test.rb
-          echo "--- patched formula ---"
-          head -12 /tmp/aoa-test.rb
+            Formula/aoa.rb > "$TAP_DIR/aoa.rb"
 
-      - name: Install formula
-        run: brew install --build-from-source /tmp/aoa-test.rb
+          echo "--- patched formula ---"
+          head -12 "$TAP_DIR/aoa.rb"
+
+          brew install --build-from-source local/aoa/aoa
 
       - name: Run brew test
-        run: brew test aoa
+        run: brew test local/aoa/aoa
 
       - name: Smoke test — help
         run: aoa --help
