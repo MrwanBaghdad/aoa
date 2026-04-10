@@ -39,7 +39,8 @@ jobs:
           # Patch in place: point at the local tarball and inject an explicit
           # version (Homebrew cannot infer one from a file:// URL)
           sed -i.bak \
-            -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"\n  version \"0.0.0-ci\"|" \
+            -e "s|version \".*\"|version \"0.0.0-ci\"|" \
+            -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"|" \
             -e "s|sha256 \".*\"|sha256 \"$SHA\"|" \
             Formula/aoa.rb
 

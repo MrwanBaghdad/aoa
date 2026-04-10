@@ -92,6 +92,7 @@ formula:
 	@URL="https://github.com/marwan/aoa/archive/refs/tags/v$(VERSION).tar.gz"; \
 	 SHA=$$(curl -sL "$$URL" | shasum -a 256 | awk '{print $$1}'); \
 	 sed -i '' \
+	     -e "s|version \".*\"|version \"$(VERSION)\"|" \
 	     -e "s|url \".*\"|url \"$$URL\"|" \
 	     -e "s|sha256 \".*\"|sha256 \"$$SHA\"|" \
 	     Formula/aoa.rb; \

@@ -4,8 +4,9 @@
 class Aoa < Formula
   desc "Run AI coding agents in isolated macOS VMs (Agent on Apple)"
   homepage "https://github.com/marwan/aoa"
+  version "0.0.0" # replaced by `make formula VERSION=x.y.z`
   url "https://github.com/marwan/aoa/archive/refs/tags/v#{version}.tar.gz"
-  sha256 "" # filled in by `make formula` or goreleaser
+  sha256 "" # filled in by `make formula VERSION=x.y.z`
   license "MIT"
   head "https://github.com/marwan/aoa.git", branch: "main"
 
