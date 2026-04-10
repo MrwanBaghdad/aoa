@@ -1,0 +1,56 @@
+name: Formula
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Formula/aoa.rb"
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/formula.yml"
+  pull_request:
+    paths:
+      - "Formula/aoa.rb"
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/formula.yml"
+
+jobs:
+  test-formula:
+    name: Install via Homebrew
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create source tarball from current commit
+        run: |
+          git archive --format=tar.gz HEAD > /tmp/aoa-local.tar.gz
+          echo "SHA=$(shasum -a 256 /tmp/aoa-local.tar.gz | awk '{print $1}')" >> "$GITHUB_ENV"
+
+      - name: Patch formula to use local tarball
+        run: |
+          cp Formula/aoa.rb /tmp/aoa-test.rb
+          # macOS sed requires an explicit backup extension with -i
+          sed -i.bak \
+            -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"|" \
+            -e "s|sha256 \".*\"|sha256 \"$SHA\"|" \
+            /tmp/aoa-test.rb
+          echo "--- patched formula ---"
+          head -12 /tmp/aoa-test.rb
+
+      - name: Install formula
+        run: brew install --build-from-source /tmp/aoa-test.rb
+
+      - name: Run brew test
+        run: brew test aoa
+
+      - name: Smoke test — help
+        run: aoa --help
+
+      - name: Smoke test — version commands exist
+        run: |
+          aoa health  || true   # exits 1 when deps missing in CI — that's fine
+          aoa list
