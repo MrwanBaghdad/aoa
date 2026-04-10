@@ -5,7 +5,6 @@ Uses testinfra via a running container so we're asserting actual system
 state rather than grepping script output for sentinel strings.
 """
 
-import shlex
 import shutil
 import subprocess
 import tempfile
@@ -20,23 +19,11 @@ pytestmark = pytest.mark.requires_container
 IMAGE = "aoa-agent:latest"
 
 
-def _image_exists(name: str) -> bool:
-    result = subprocess.run(
-        ["container", "image", "list", "--quiet"],
-        capture_output=True, text=True,
-    )
-    return name in result.stdout
-
-
-# ---------------------------------------------------------------------------
-# Build
-# ---------------------------------------------------------------------------
-
-def test_build_command_succeeds():
-    """aoa build must exit 0 — catches Dockerfile syntax errors and bad package names."""
-    if not _image_exists(IMAGE):
-        result = run_aoa(["build"], timeout=600)
-        assert result.returncode == 0, f"aoa build failed:\n{result.stderr}"
+@pytest.fixture(scope="module", autouse=True)
+def built_image():
+    """Always build aoa-agent:latest before any test in this module runs."""
+    result = run_aoa(["build"], timeout=600)
+    assert result.returncode == 0, f"aoa build failed:\n{result.stderr}"
 
 
 # ---------------------------------------------------------------------------
@@ -108,12 +95,7 @@ def test_image_has_no_critical_or_high_cves():
     Exports the image as an OCI tarball via `container image save`, then
     scans it with Trivy. Findings are suppressed via .trivyignore — each
     suppressed entry must have a reason comment and an expiry date.
-
-    Fails immediately if Trivy is not installed (add via: devbox install).
     """
-    if not _image_exists(IMAGE):
-        pytest.skip(f"{IMAGE} not built — run: aoa build")
-
     trivy = shutil.which("trivy")
     if trivy is None:
         pytest.fail(
@@ -125,21 +107,19 @@ def test_image_has_no_critical_or_high_cves():
         tarball = f.name
 
     try:
-        # Export the image from apple/container's store as an OCI tarball
         save = subprocess.run(
             ["container", "image", "save", IMAGE, "--output", tarball],
             capture_output=True, text=True, timeout=120,
         )
         assert save.returncode == 0, f"container image save failed:\n{save.stderr}"
 
-        ignorefile = str(REPO_ROOT / ".trivyignore")
         scan = subprocess.run(
             [
                 trivy, "image",
                 "--input", tarball,
                 "--severity", "CRITICAL,HIGH",
                 "--exit-code", "1",
-                "--ignorefile", ignorefile,
+                "--ignorefile", str(REPO_ROOT / ".trivyignore"),
                 "--no-progress",
                 "--format", "table",
             ],
