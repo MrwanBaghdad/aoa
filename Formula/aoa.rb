@@ -3,15 +3,15 @@
 
 class Aoa < Formula
   desc "Run AI coding agents in isolated macOS VMs (Agent on Apple)"
-  homepage "https://github.com/marwan/aoa"
-  version "0.0.0" # replaced by `make formula VERSION=x.y.z`
-  url "https://github.com/marwan/aoa/archive/refs/tags/v#{version}.tar.gz"
-  sha256 "" # filled in by `make formula VERSION=x.y.z`
+  homepage "https://github.com/MrwanBaghdad/aoa"
   license "MIT"
-  head "https://github.com/marwan/aoa.git", branch: "main"
+  head "https://github.com/MrwanBaghdad/aoa.git", branch: "main"
+
+  # Stable url/version/sha256 are added here by `make formula VERSION=x.y.z`
+  # when a release is tagged.
 
   bottle do
-    # bottles are built by CI and uploaded alongside the release
+    # bottles are built by CI and uploaded alongside releases
   end
 
   depends_on :macos
@@ -19,7 +19,7 @@ class Aoa < Formula
 
   def install
     system "go", "build",
-           "-ldflags", "-s -w -X main.version=#{version}",
+           "-ldflags", "-s -w",
            "-o", bin/"aoa",
            "."
   end

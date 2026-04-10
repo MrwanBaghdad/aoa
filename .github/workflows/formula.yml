@@ -47,11 +47,9 @@ jobs:
           git -C "$TAP_DIR" config user.email "ci@aoa"
           git -C "$TAP_DIR" config user.name "CI"
 
-          # Patch the formula and write it into the tap
+          # Inject version/url/sha256 into the head-only formula for CI
           sed \
-            -e "s|version \".*\"|version \"0.0.0-ci\"|" \
-            -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"|" \
-            -e "s|sha256 \".*\"|sha256 \"$SHA\"|" \
+            -e "s|head \".*\"|head \"https://github.com/MrwanBaghdad/aoa.git\", branch: \"main\"\n\n  version \"0.0.0-ci\"\n  url \"file:///tmp/aoa-local.tar.gz\"\n  sha256 \"$SHA\"|" \
             Formula/aoa.rb > "$TAP_DIR/Formula/aoa.rb"
 
           git -C "$TAP_DIR" add Formula/aoa.rb

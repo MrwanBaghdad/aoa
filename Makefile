@@ -89,12 +89,10 @@ clean:
 # Copy the result to your homebrew-tap repo before pushing.
 formula:
 	@test -n "$(VERSION)" || (echo "usage: make formula VERSION=x.y.z" && exit 1)
-	@URL="https://github.com/marwan/aoa/archive/refs/tags/v$(VERSION).tar.gz"; \
+	@URL="https://github.com/MrwanBaghdad/aoa/archive/refs/tags/v$(VERSION).tar.gz"; \
 	 SHA=$$(curl -sL "$$URL" | shasum -a 256 | awk '{print $$1}'); \
 	 sed -i '' \
-	     -e "s|version \".*\"|version \"$(VERSION)\"|" \
-	     -e "s|url \".*\"|url \"$$URL\"|" \
-	     -e "s|sha256 \".*\"|sha256 \"$$SHA\"|" \
+	     -e "s|head \".*\"|head \"https://github.com/MrwanBaghdad/aoa.git\", branch: \"main\"\n\n  version \"$(VERSION)\"\n  url \"$$URL\"\n  sha256 \"$$SHA\"|" \
 	     Formula/aoa.rb; \
 	 echo "Formula/aoa.rb updated for v$(VERSION) (sha256=$$SHA)"
 

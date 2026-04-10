@@ -47,12 +47,12 @@ sudo mv aoa /usr/local/bin/
 
 ### Homebrew
 
-Once a release is tagged, install via:
-
 ```bash
 brew tap marwan/aoa https://github.com/MrwanBaghdad/aoa
-brew install marwan/aoa/aoa
+brew install --HEAD marwan/aoa/aoa
 ```
+
+Once a release is tagged, the `--HEAD` flag can be dropped.
 
 ### Build the agent image
 
