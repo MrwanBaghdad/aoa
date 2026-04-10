@@ -85,9 +85,15 @@ def test_entrypoint_sets_loopback_accept():
 
 
 def test_entrypoint_exec_handoff():
-    """Script must exec "$@" to hand off to the agent."""
+    """Script must exec the agent via capsh to drop caps before handoff."""
     script = (REPO_ROOT / "scripts" / "entrypoint.sh").read_text()
-    assert 'exec "$@"' in script
+    assert "exec capsh" in script
+
+
+def test_entrypoint_drops_net_admin_cap():
+    """CAP_NET_ADMIN must be dropped so the agent cannot modify iptables rules."""
+    script = (REPO_ROOT / "scripts" / "entrypoint.sh").read_text()
+    assert "cap_net_admin" in script
 
 
 def test_entrypoint_is_executable():
