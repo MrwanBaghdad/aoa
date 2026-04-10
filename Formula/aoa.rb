@@ -16,6 +16,7 @@ class Aoa < Formula
 
   depends_on :macos
   depends_on "go" => :build
+  depends_on "container"
 
   def install
     system "go", "build",
@@ -26,9 +27,6 @@ class Aoa < Formula
 
   def caveats
     <<~EOS
-      aoa requires apple/container to run VMs:
-        https://github.com/apple/container
-
       To get started:
         aoa build          # build the agent container image
         aoa health         # verify all dependencies
