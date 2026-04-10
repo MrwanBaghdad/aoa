@@ -77,6 +77,17 @@ lint-python:
 # Run everything: build, Go tests, CLI integration tests
 ci: build test-race lint vuln integrations-cli
 
+# Scan the built image for CRITICAL/HIGH CVEs (requires aoa build first)
+scan-image:
+	@IMAGE=aoa-agent:latest; \
+	TARBALL=$$(mktemp /tmp/aoa-scan-XXXXXX.tar); \
+	echo "Exporting $$IMAGE..."; \
+	container image save $$IMAGE --output $$TARBALL; \
+	echo "Scanning with Trivy..."; \
+	trivy image --input $$TARBALL --severity CRITICAL,HIGH --exit-code 1 \
+	  --ignorefile .trivyignore --no-progress; \
+	STATUS=$$?; rm -f $$TARBALL; exit $$STATUS
+
 clean:
 	rm -f $(BINARY) coverage.out coverage.html
 

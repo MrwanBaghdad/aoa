@@ -1,0 +1,15 @@
+# .trivyignore — suppressed Trivy findings
+#
+# Each entry must include:
+#   1. A comment explaining why it is suppressed
+#   2. An expiry date so suppressions don't become permanent
+#
+# Format:
+#   # <reason>
+#   # expires: YYYY-MM-DD
+#   CVE-XXXX-XXXXX
+#
+# Example (remove when adding a real entry):
+#   # CVE-2024-12345: no fix available in Ubuntu 24.04 as of today
+#   # expires: 2026-07-01
+#   CVE-2024-12345

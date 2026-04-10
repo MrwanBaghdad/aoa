@@ -3,7 +3,9 @@
   "packages": [
     "go@latest",
     "tmux@latest",
-    "golangci-lint@latest"
+    "golangci-lint@latest",
+    "gh@latest",
+    "trivy@latest"
   ],
   "shell": {
     "init_hook": [
