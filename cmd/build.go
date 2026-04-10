@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -12,10 +12,20 @@ import (
 )
 
 var (
-	buildTag        string
-	buildTarget     string
-	buildNoCache    bool
+	buildTag     string
+	buildTarget  string
+	buildNoCache bool
+
+	// buildAssets is set by main via SetBuildAssets before Execute() is called.
+	// It holds the embedded images/ and scripts/ directories.
+	buildAssets fs.FS
 )
+
+// SetBuildAssets wires the embedded build assets (Dockerfiles + scripts) into
+// the build command. Called once from main() before cmd.Execute().
+func SetBuildAssets(f fs.FS) {
+	buildAssets = f
+}
 
 var buildCmd = &cobra.Command{
 	Use:          "build",
@@ -23,12 +33,12 @@ var buildCmd = &cobra.Command{
 	SilenceUsage: true,
 	Long: `Build the aoa-agent container image using apple/container's BuildKit.
 
-The default build produces aoa-agent:latest using images/Dockerfile (multi-stage).
-Use --target base to build only the base layer.
+The Dockerfile and entrypoint scripts are embedded in the aoa binary, so
+this command works whether aoa was installed via Homebrew or built from source.
 
 Examples:
   aoa build                         # build aoa-agent:latest
-  aoa build --target base           # build only the base image (aoa-base:latest)
+  aoa build --target base           # build only the base layer (aoa-base:latest)
   aoa build --tag my-agent:v2       # custom tag
   aoa build --no-cache              # force full rebuild
 `,
@@ -47,15 +57,14 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	imagesDir := findImagesDir()
-	dockerfile := filepath.Join(imagesDir, "Dockerfile")
-
-	// Verify the Dockerfile exists
-	if _, err := os.Stat(dockerfile); err != nil {
-		return fmt.Errorf("dockerfile not found at %s — are you running from the aoa repo root?", dockerfile)
+	// Write the embedded build context (images/ + scripts/) to a temp directory.
+	// apple/container's BuildKit needs real files on disk.
+	buildCtx, err := extractBuildAssets()
+	if err != nil {
+		return fmt.Errorf("extracting build assets: %w", err)
 	}
+	defer os.RemoveAll(buildCtx)
 
-	// Default tag based on target
 	tag := buildTag
 	if tag == "" {
 		switch buildTarget {
@@ -66,27 +75,42 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Context dir is the repo root (scripts/ must be accessible from Dockerfile)
-	contextDir := findRepoRoot()
-
+	dockerfile := filepath.Join(buildCtx, "images", "Dockerfile")
 	fmt.Printf("Building %s (target: %s)...\n", tag, buildTarget)
-	return rt.BuildWithTarget(dockerfile, tag, buildTarget, contextDir, buildNoCache)
+	return rt.BuildWithTarget(dockerfile, tag, buildTarget, buildCtx, buildNoCache)
 }
 
-func findImagesDir() string {
-	// In dev: file is .../cmd/build.go → images/ is one level up
-	_, file, _, ok := runtime.Caller(0)
-	if ok {
-		return filepath.Join(filepath.Dir(filepath.Dir(file)), "images")
+// extractBuildAssets writes the embedded images/ and scripts/ directories to
+// a temporary directory and returns its path. The caller is responsible for
+// removing it.
+func extractBuildAssets() (string, error) {
+	tmp, err := os.MkdirTemp("", "aoa-build-*")
+	if err != nil {
+		return "", err
 	}
-	return "images"
-}
 
-func findRepoRoot() string {
-	_, file, _, ok := runtime.Caller(0)
-	if ok {
-		return filepath.Dir(filepath.Dir(file))
+	err = fs.WalkDir(buildAssets, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		dest := filepath.Join(tmp, path)
+		if d.IsDir() {
+			return os.MkdirAll(dest, 0755)
+		}
+		data, err := fs.ReadFile(buildAssets, path)
+		if err != nil {
+			return err
+		}
+		// Preserve executable bits for scripts
+		mode := fs.FileMode(0644)
+		if info, err := d.Info(); err == nil {
+			mode = info.Mode()
+		}
+		return os.WriteFile(dest, data, mode)
+	})
+	if err != nil {
+		os.RemoveAll(tmp)
+		return "", err
 	}
-	wd, _ := os.Getwd()
-	return wd
+	return tmp, nil
 }

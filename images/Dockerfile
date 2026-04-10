@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y \
     iproute2 \
     iputils-ping \
     dnsutils \
+    libcap2-bin \
     && rm -rf /var/lib/apt/lists/*
 
 # Set iptables-legacy as default (nftables not supported in apple/container VMs)
