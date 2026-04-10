@@ -37,18 +37,26 @@ jobs:
           git archive --format=tar.gz HEAD > /tmp/aoa-local.tar.gz
           echo "SHA=$(shasum -a 256 /tmp/aoa-local.tar.gz | awk '{print $1}')" >> "$GITHUB_ENV"
 
-      - name: Tap repo and patch formula in tap directory
+      - name: Create local tap and install
         run: |
-          brew tap marwan/aoa https://github.com/MrwanBaghdad/aoa
-          TAP_FORMULA="$(brew --repository)/Library/Taps/marwan/homebrew-aoa/Formula/aoa.rb"
-          # Patch the formula in the tap to use the local tarball.
-          # Must patch in the tap dir (not the workspace) since brew tap clones
-          # from git and only sees committed files.
-          sed -i.bak \
+          # Build a minimal tap directory without cloning from GitHub
+          # (avoids auth issues with private repos and is faster).
+          TAP_DIR="$(brew --repository)/Library/Taps/marwan/homebrew-aoa"
+          mkdir -p "$TAP_DIR/Formula"
+          git -C "$TAP_DIR" init -q
+          git -C "$TAP_DIR" config user.email "ci@aoa"
+          git -C "$TAP_DIR" config user.name "CI"
+
+          # Patch the formula and write it into the tap
+          sed \
             -e "s|version \".*\"|version \"0.0.0-ci\"|" \
             -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"|" \
             -e "s|sha256 \".*\"|sha256 \"$SHA\"|" \
-            "$TAP_FORMULA"
+            Formula/aoa.rb > "$TAP_DIR/Formula/aoa.rb"
+
+          git -C "$TAP_DIR" add Formula/aoa.rb
+          git -C "$TAP_DIR" commit -q -m "ci"
+
           brew install --build-from-source marwan/aoa/aoa
 
       - name: Run brew test
