@@ -1,112 +1,119 @@
-"""Tests for secret injection via tmpfiles."""
+"""Tests for secret injection configuration and CLI smoke test."""
 
 import os
-import stat
-import tempfile
+import sys
 from pathlib import Path
 
 import pytest
 
-
-# We test the inject logic by invoking a Go test binary or by importing
-# patterns from the source. For Python-level tests we validate the behaviour
-# indirectly through the CLI and directly through file-level checks.
-
-REPO_ROOT = Path(__file__).parent.parent.parent
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 pytestmark = pytest.mark.cli
 
-
-# ---------------------------------------------------------------------------
-# secretspec.toml parsing / structure tests
-# ---------------------------------------------------------------------------
-
-def test_example_secretspec_toml_exists():
-    path = REPO_ROOT / "config" / "secretspec.toml"
-    assert path.exists()
-
-
-def test_example_secretspec_has_project_section():
-    path = REPO_ROOT / "config" / "secretspec.toml"
-    content = path.read_text()
-    assert "[project]" in content
-    assert "name" in content
-
-
-def test_example_secretspec_has_default_profile():
-    content = (REPO_ROOT / "config" / "secretspec.toml").read_text()
-    assert "[profiles.default" in content
-
-
-def test_example_secretspec_has_anthropic_key():
-    content = (REPO_ROOT / "config" / "secretspec.toml").read_text()
-    assert "ANTHROPIC_API_KEY" in content
-
-
-def test_example_secretspec_has_required_field():
-    content = (REPO_ROOT / "config" / "secretspec.toml").read_text()
-    assert "required = true" in content
-
-
-def test_example_secretspec_has_development_profile():
-    content = (REPO_ROOT / "config" / "secretspec.toml").read_text()
-    assert "[profiles.development" in content
-
-
-def test_example_secretspec_has_default_value():
-    content = (REPO_ROOT / "config" / "secretspec.toml").read_text()
-    assert "default = " in content
+REPO_ROOT = Path(__file__).parent.parent.parent
+SECRETSPEC = str(REPO_ROOT / "config" / "secretspec.toml")
+DEFAULT_CFG = str(REPO_ROOT / "config" / "default.toml")
 
 
 # ---------------------------------------------------------------------------
-# default config validation
+# config/secretspec.toml — structure validation via TOML parse
 # ---------------------------------------------------------------------------
 
-def test_default_config_toml_exists():
-    assert (REPO_ROOT / "config" / "default.toml").exists()
+def test_example_secretspec_toml_exists(local_host):
+    assert local_host.file(SECRETSPEC).is_file
 
 
-def test_default_config_has_image():
-    content = (REPO_ROOT / "config" / "default.toml").read_text()
-    assert "image" in content
-    assert "aoa-agent" in content
+def test_example_secretspec_has_project_section(local_host):
+    cfg = tomllib.loads(local_host.file(SECRETSPEC).content_string)
+    assert "project" in cfg
+    assert "name" in cfg["project"]
 
 
-def test_default_config_has_network_mode():
-    content = (REPO_ROOT / "config" / "default.toml").read_text()
-    assert "mode" in content
-    assert "restricted" in content
+def test_example_secretspec_has_default_profile(local_host):
+    cfg = tomllib.loads(local_host.file(SECRETSPEC).content_string)
+    assert "profiles" in cfg
+    assert "default" in cfg["profiles"]
 
 
-def test_default_config_has_env_keys():
-    content = (REPO_ROOT / "config" / "default.toml").read_text()
-    assert "env_keys" in content
-    assert "ANTHROPIC_API_KEY" in content
+def test_example_secretspec_has_anthropic_key(local_host):
+    cfg = tomllib.loads(local_host.file(SECRETSPEC).content_string)
+    profile = cfg["profiles"]["default"]
+    assert "ANTHROPIC_API_KEY" in profile
 
 
-def test_default_config_network_section():
-    content = (REPO_ROOT / "config" / "default.toml").read_text()
-    assert "[network]" in content
+def test_example_secretspec_has_required_field(local_host):
+    cfg = tomllib.loads(local_host.file(SECRETSPEC).content_string)
+    profile = cfg["profiles"]["default"]
+    assert profile["ANTHROPIC_API_KEY"].get("required") is True
 
 
-def test_default_config_secrets_section():
-    content = (REPO_ROOT / "config" / "default.toml").read_text()
-    assert "[secrets]" in content
+def test_example_secretspec_has_development_profile(local_host):
+    cfg = tomllib.loads(local_host.file(SECRETSPEC).content_string)
+    assert "development" in cfg["profiles"]
+
+
+def test_example_secretspec_has_default_value(local_host):
+    cfg = tomllib.loads(local_host.file(SECRETSPEC).content_string)
+    # At least one key in any profile should have a default value
+    profiles = cfg.get("profiles", {})
+    has_default = any(
+        isinstance(v, dict) and "default" in v
+        for profile in profiles.values()
+        for v in profile.values()
+        if isinstance(v, dict)
+    )
+    assert has_default, "No key with 'default' value found in secretspec.toml"
 
 
 # ---------------------------------------------------------------------------
-# Shell → secret injection smoke test (no container, just checks the CLI
-# doesn't panic when secrets are missing and gives a clear error)
+# config/default.toml — structure validation via TOML parse
+# ---------------------------------------------------------------------------
+
+def test_default_config_toml_exists(local_host):
+    assert local_host.file(DEFAULT_CFG).is_file
+
+
+def test_default_config_has_image(local_host):
+    cfg = tomllib.loads(local_host.file(DEFAULT_CFG).content_string)
+    assert "sandbox" in cfg
+    assert "image" in cfg["sandbox"]
+    assert "aoa-agent" in cfg["sandbox"]["image"]
+
+
+def test_default_config_has_network_mode(local_host):
+    cfg = tomllib.loads(local_host.file(DEFAULT_CFG).content_string)
+    assert "network" in cfg
+    assert cfg["network"]["mode"] == "restricted"
+
+
+def test_default_config_has_env_keys(local_host):
+    cfg = tomllib.loads(local_host.file(DEFAULT_CFG).content_string)
+    assert "secrets" in cfg
+    env_keys = cfg["secrets"].get("env_keys", [])
+    assert "ANTHROPIC_API_KEY" in env_keys
+
+
+def test_default_config_network_section(local_host):
+    cfg = tomllib.loads(local_host.file(DEFAULT_CFG).content_string)
+    assert "network" in cfg
+
+
+def test_default_config_secrets_section(local_host):
+    cfg = tomllib.loads(local_host.file(DEFAULT_CFG).content_string)
+    assert "secrets" in cfg
+
+
+# ---------------------------------------------------------------------------
+# CLI smoke test — aoa shell must not panic when secrets are missing
 # ---------------------------------------------------------------------------
 
 def test_shell_does_not_panic_without_api_key(aoa_binary, workspace_dir):
-    """aoa shell must not panic when ANTHROPIC_API_KEY is unset.
-
-    Auth falls back to CLAUDE_CODE_OAUTH_TOKEN or macOS Keychain automatically.
-    """
+    """aoa shell must not panic when ANTHROPIC_API_KEY is unset."""
     from support.helpers import run_aoa
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     result = run_aoa(["shell", str(workspace_dir), "--agent", "echo ok"], env=env, timeout=15)
     combined = result.stdout + result.stderr
-    # The only requirement: no Go runtime panic
     assert "goroutine" not in combined and "runtime error" not in combined

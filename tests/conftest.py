@@ -6,10 +6,13 @@ import json
 import os
 import subprocess
 import time
+import uuid
 from pathlib import Path
 from typing import Generator
 
 import pytest
+import testinfra
+import testinfra.backend.base
 
 from support.helpers import (
     cleanup_sessions,
@@ -20,8 +23,70 @@ from support.helpers import (
 
 
 # ---------------------------------------------------------------------------
+# Custom testinfra backend for apple/container
+# ---------------------------------------------------------------------------
+
+class ContainerExecBackend(testinfra.backend.base.BaseBackend):
+    """Runs testinfra commands via `container exec <id>`.
+
+    apple/container has the same exec interface as docker but uses a different
+    binary name, so we can't use testinfra's built-in docker backend directly.
+    """
+
+    NAME = "container-exec"
+
+    def __init__(self, container_id: str, *args, **kwargs):
+        self._container_id = container_id
+        super().__init__(container_id, *args, **kwargs)
+
+    def run(self, command: str, *args, **kwargs):
+        cmd = ["container", "exec", self._container_id, "sh", "-c", command]
+        r = subprocess.run(cmd, capture_output=True, timeout=30)
+        return self.result(r.returncode, command, r.stdout, r.stderr)
+
+
+# ---------------------------------------------------------------------------
 # Session-scoped fixtures
 # ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def local_host():
+    """Testinfra host on the local machine — for asserting source file structure."""
+    return testinfra.get_host("local://")
+
+
+@pytest.fixture(scope="module")
+def image_host(has_container_runtime):
+    """Testinfra host running inside aoa-agent:latest.
+
+    Starts a single long-lived container per test module, yields a testinfra
+    Host backed by `container exec`, then tears the container down.
+    """
+    if not has_container_runtime:
+        pytest.skip("apple/container not installed")
+
+    image = "aoa-agent:latest"
+    result = subprocess.run(
+        ["container", "image", "list", "--quiet"],
+        capture_output=True, text=True,
+    )
+    if image not in result.stdout:
+        pytest.skip(f"{image} not built — run: aoa build")
+
+    name = f"testinfra-{uuid.uuid4().hex[:8]}"
+    subprocess.run(
+        ["container", "run", "-d", "--name", name, image, "sleep", "3600"],
+        check=True, capture_output=True,
+    )
+
+    backend = ContainerExecBackend(name)
+    host = testinfra.host.Host(backend)
+
+    yield host
+
+    subprocess.run(["container", "stop", name], capture_output=True)
+    subprocess.run(["container", "rm", name], capture_output=True)
+
 
 @pytest.fixture(scope="session")
 def aoa_binary() -> str:
