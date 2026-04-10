@@ -32,25 +32,27 @@ jobs:
       - name: Update Homebrew
         run: brew update
 
-      - name: Create source tarball and patch formula
+      - name: Create source tarball
         run: |
           git archive --format=tar.gz HEAD > /tmp/aoa-local.tar.gz
-          SHA=$(shasum -a 256 /tmp/aoa-local.tar.gz | awk '{print $1}')
-          # Patch in place: point at the local tarball and inject an explicit
-          # version (Homebrew cannot infer one from a file:// URL)
+          echo "SHA=$(shasum -a 256 /tmp/aoa-local.tar.gz | awk '{print $1}')" >> "$GITHUB_ENV"
+
+      - name: Tap repo and patch formula in tap directory
+        run: |
+          brew tap marwan/aoa https://github.com/MrwanBaghdad/aoa
+          TAP_FORMULA="$(brew --repository)/Library/Taps/marwan/homebrew-aoa/Formula/aoa.rb"
+          # Patch the formula in the tap to use the local tarball.
+          # Must patch in the tap dir (not the workspace) since brew tap clones
+          # from git and only sees committed files.
           sed -i.bak \
             -e "s|version \".*\"|version \"0.0.0-ci\"|" \
             -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"|" \
             -e "s|sha256 \".*\"|sha256 \"$SHA\"|" \
-            Formula/aoa.rb
-
-      - name: Tap the local repo and install
-        run: |
-          brew tap marwan/aoa "$GITHUB_WORKSPACE"
+            "$TAP_FORMULA"
           brew install --build-from-source marwan/aoa/aoa
 
       - name: Run brew test
-        run: brew test marwan/aoa/aoa
+        run: brew test marwan/aoa/aoa --verbose
 
       - name: Smoke tests
         run: |
