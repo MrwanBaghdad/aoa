@@ -43,9 +43,11 @@ jobs:
           brew tap-new local/aoa
           TAP_DIR="$(brew --repository)/Library/Taps/local/homebrew-aoa/Formula"
 
-          # Patch URL + sha256 to point at the local tarball
+          # Patch URL + sha256 to point at the local tarball.
+          # Also inject an explicit version since Homebrew can't infer one
+          # from a file:// URL (no version in the filename).
           sed \
-            -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"|" \
+            -e "s|url \".*\"|url \"file:///tmp/aoa-local.tar.gz\"\n  version \"0.0.0-ci\"|" \
             -e "s|sha256 \".*\"|sha256 \"$SHA\"|" \
             Formula/aoa.rb > "$TAP_DIR/aoa.rb"
 
