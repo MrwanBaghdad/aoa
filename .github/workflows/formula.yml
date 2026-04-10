@@ -22,8 +22,15 @@ jobs:
     name: Install via Homebrew
     runs-on: macos-latest
 
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Update Homebrew
+        run: brew update
 
       - name: Create source tarball from current commit
         run: |
