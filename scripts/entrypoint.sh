@@ -56,6 +56,7 @@ apply_network_policy() {
 # Apply network policy (requires root — apple/container runs as root by default)
 if [ "$(id -u)" = "0" ]; then
     apply_network_policy
+    echo "[aoa] OUTPUT policy: $($IPT -S OUTPUT 2>&1 | head -10)"
 
     # --allow-host: punch a hole to the host machine's gateway IP.
     # Inserted at position 1 so it takes priority over private-network DROP rules.

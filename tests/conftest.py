@@ -75,7 +75,7 @@ def image_host(has_container_runtime):
 
     name = f"testinfra-{uuid.uuid4().hex[:8]}"
     subprocess.run(
-        ["container", "run", "-d", "--name", name, image, "sleep", "3600"],
+        ["container", "run", "-d", "--name", name, "--entrypoint", "sleep", image, "3600"],
         check=True, capture_output=True,
     )
 

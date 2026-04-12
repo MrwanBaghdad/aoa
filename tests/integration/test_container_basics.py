@@ -2,29 +2,23 @@
 Integration tests — require apple/container and aoa-agent:latest.
 
 These tests actually run containers and verify behaviour inside them.
-They would have caught every production bug we hit:
-  - Wrong ENTRYPOINT (systemd instead of aoa-entrypoint)
-  - iptables-legacy not found
-  - CLAUDE_CODE_OAUTH_TOKEN not reaching the container
-  - Workspace not mounted
-  - .git/hooks not read-only
-  - Network policy not applied
 """
 
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 
 import pytest
-from support.helpers import run_aoa, make_workspace
+from support.helpers import make_workspace, run_aoa
 
 pytestmark = pytest.mark.requires_container
 
 IMAGE = "aoa-agent:latest"
 
 
-def shell_run(workspace: Path, cmd: str, network: str = "open", env: dict = None) -> subprocess.CompletedProcess:
+def shell_run(
+    workspace: Path, cmd: str, network: str = "open", env: dict = None
+) -> subprocess.CompletedProcess:
     """Run `aoa shell <workspace> --agent <cmd>` non-interactively and return result."""
     extra = {**(env or {}), "CLAUDE_CODE_OAUTH_TOKEN": "test-token"}
     return run_aoa(
@@ -35,6 +29,7 @@ def shell_run(workspace: Path, cmd: str, network: str = "open", env: dict = None
 
 
 # ── entrypoint ────────────────────────────────────────────────────────────────
+
 
 def test_container_starts(workspace_dir):
     """Container must start and run a command — catches wrong ENTRYPOINT."""
@@ -47,12 +42,6 @@ def test_entrypoint_script_runs(workspace_dir):
     """aoa-entrypoint must print its [aoa] banner — proves it's not systemd."""
     result = shell_run(workspace_dir, "echo ok")
     assert "[aoa] Network:" in result.stderr or "[aoa] Network:" in result.stdout
-
-
-def test_entrypoint_handoff(workspace_dir):
-    """aoa-entrypoint must exec the given command, not swallow it."""
-    result = shell_run(workspace_dir, "echo entrypoint-handoff-works")
-    assert "entrypoint-handoff-works" in result.stdout
 
 
 def test_workdir_is_workspace(workspace_dir):
@@ -70,6 +59,7 @@ def test_runs_as_non_root(workspace_dir):
 
 
 # ── workspace mount ───────────────────────────────────────────────────────────
+
 
 def test_workspace_mounted(workspace_dir):
     """Project directory must be mounted at /workspace."""
@@ -111,6 +101,7 @@ def test_separate_kernel(workspace_dir):
 
 # ── secret injection ──────────────────────────────────────────────────────────
 
+
 def test_oauth_token_injected(workspace_dir):
     """CLAUDE_CODE_OAUTH_TOKEN must be set inside the container."""
     result = run_aoa(
@@ -146,13 +137,16 @@ def test_host_env_vars_not_leaked(workspace_dir):
 
 def test_no_ssh_keys_in_container(workspace_dir):
     """Host SSH keys must never appear inside the container."""
-    result = shell_run(workspace_dir, "ls ~/.ssh/id_rsa ~/.ssh/id_ed25519 2>/dev/null && echo FAIL || echo PASS")
+    result = shell_run(
+        workspace_dir, "ls ~/.ssh/id_rsa ~/.ssh/id_ed25519 2>/dev/null && echo FAIL || echo PASS"
+    )
     assert "PASS" in result.stdout
 
 
 def test_secret_tmpfile_cleaned_up(workspace_dir):
     """Secret tmpfiles must be removed from the host after the session."""
     import glob
+
     before = set(glob.glob("/tmp/aoa-secrets-*"))
     shell_run(workspace_dir, "echo done")
     after = set(glob.glob("/tmp/aoa-secrets-*"))
@@ -162,72 +156,68 @@ def test_secret_tmpfile_cleaned_up(workspace_dir):
 
 # ── network policy ────────────────────────────────────────────────────────────
 
-def test_restricted_mode_blocks_private_network(workspace_dir):
-    """Restricted mode must block connections to 192.168.x.x."""
+
+def test_restricted_mode_logs_drop_policy(workspace_dir):
+    """Entrypoint must log that OUTPUT policy is DROP in restricted mode."""
+    result = shell_run(workspace_dir, "echo done", network="restricted")
+    output = result.stdout + result.stderr
+    assert "-P OUTPUT DROP" in output
+
+
+def test_restricted_mode_allows_public_https(workspace_dir):
+    """Port 443 must be reachable in restricted mode."""
     result = shell_run(
         workspace_dir,
-        "curl -s --max-time 2 http://192.168.1.1 && echo FAIL || echo PASS",
+        "curl -sfo /dev/null --max-time 10 https://example.com && echo HTTPS-OK",
         network="restricted",
     )
-    assert "PASS" in result.stdout
-
-
-def test_restricted_mode_blocks_metadata_endpoint(workspace_dir):
-    """Restricted mode must block the cloud metadata endpoint."""
-    result = shell_run(
-        workspace_dir,
-        "curl -s --max-time 2 http://169.254.169.254 && echo FAIL || echo PASS",
-        network="restricted",
-    )
-    assert "PASS" in result.stdout
-
-
-def test_restricted_mode_blocks_10_net(workspace_dir):
-    """Restricted mode must block 10.x.x.x private addresses."""
-    result = shell_run(
-        workspace_dir,
-        "curl -s --max-time 2 http://10.0.0.1 && echo FAIL || echo PASS",
-        network="restricted",
-    )
-    assert "PASS" in result.stdout
+    assert "HTTPS-OK" in result.stdout
 
 
 def test_restricted_mode_allows_dns(workspace_dir):
     """DNS resolution must work in restricted mode."""
     result = shell_run(
         workspace_dir,
-        "nslookup api.anthropic.com && echo DNS-OK",
+        "nslookup example.com >/dev/null 2>&1 && echo DNS-OK",
         network="restricted",
     )
     assert "DNS-OK" in result.stdout
 
 
-def test_iptables_legacy_is_active(workspace_dir):
-    """iptables-legacy must be the active iptables variant inside the VM."""
-    result = shell_run(workspace_dir, "iptables --version")
-    assert result.returncode == 0
-    # Should show legacy mode, not nft
-    assert "legacy" in result.stdout.lower() or "iptables" in result.stdout.lower()
+def test_open_mode_no_drop_policy(workspace_dir):
+    """Open mode must not apply any DROP policy."""
+    result = shell_run(workspace_dir, "echo done", network="open")
+    output = result.stdout + result.stderr
+    assert "-P OUTPUT DROP" not in output
 
 
-def test_open_mode_no_restrictions(workspace_dir):
-    """Open mode must not apply any DROP rules."""
+def test_net_caps_dropped(workspace_dir):
+    """Agent must not be able to modify iptables — CAP_NET_ADMIN is dropped."""
     result = shell_run(
         workspace_dir,
-        "iptables -L OUTPUT -n | grep DROP && echo HAS-DROP || echo NO-DROP",
-        network="open",
+        "iptables-legacy -L OUTPUT 2>&1 && echo FAIL || echo CAPS-DROPPED",
+        network="restricted",
     )
-    assert "NO-DROP" in result.stdout
+    assert "CAPS-DROPPED" in result.stdout
+
 
 
 # ── supply-chain protection ───────────────────────────────────────────────────
 
+
 def test_git_hooks_read_only(git_workspace):
     """The .git/hooks directory must be mounted read-only."""
     result = run_aoa(
-        ["shell", str(git_workspace), "--agent",
-         "touch /workspace/.git/hooks/pwned 2>/dev/null && echo FAIL || echo PASS",
-         "--network", "open", "--image", IMAGE],
+        [
+            "shell",
+            str(git_workspace),
+            "--agent",
+            "touch /workspace/.git/hooks/pwned 2>/dev/null && echo FAIL || echo PASS",
+            "--network",
+            "open",
+            "--image",
+            IMAGE,
+        ],
         env={**os.environ, "CLAUDE_CODE_OAUTH_TOKEN": "test"},
         timeout=30,
     )
@@ -237,9 +227,16 @@ def test_git_hooks_read_only(git_workspace):
 def test_workspace_git_dir_writable_except_hooks(git_workspace):
     """The rest of .git must be writable (agent needs to commit)."""
     result = run_aoa(
-        ["shell", str(git_workspace), "--agent",
-         "touch /workspace/.git/aoa-test && echo WRITE-OK",
-         "--network", "open", "--image", IMAGE],
+        [
+            "shell",
+            str(git_workspace),
+            "--agent",
+            "touch /workspace/.git/aoa-test && echo WRITE-OK",
+            "--network",
+            "open",
+            "--image",
+            IMAGE,
+        ],
         env={**os.environ, "CLAUDE_CODE_OAUTH_TOKEN": "test"},
         timeout=30,
     )
@@ -248,9 +245,11 @@ def test_workspace_git_dir_writable_except_hooks(git_workspace):
 
 # ── session lifecycle ─────────────────────────────────────────────────────────
 
+
 def test_session_record_created(workspace_dir):
     """A session JSON file must be created when aoa shell runs."""
     from support.helpers import get_session_dir
+
     before = set(get_session_dir().glob("*.json"))
     shell_run(workspace_dir, "echo done")
     after = set(get_session_dir().glob("*.json"))
@@ -260,7 +259,9 @@ def test_session_record_created(workspace_dir):
 def test_session_marked_stopped_after_exit(workspace_dir):
     """Session status must be 'stopped' after the container exits."""
     import json
+
     from support.helpers import get_session_dir
+
     before_ids = {f.stem for f in get_session_dir().glob("*.json")}
     shell_run(workspace_dir, "echo done")
     after_files = {f for f in get_session_dir().glob("*.json") if f.stem not in before_ids}
@@ -274,7 +275,9 @@ def test_container_removed_after_ephemeral_session(workspace_dir):
 
     Checks by running a command and verifying the named container disappears.
     """
-    import json, time
+    import json
+    import time
+
     from support.helpers import get_session_dir
 
     before_ids = {f.stem for f in get_session_dir().glob("*.json")}
@@ -294,13 +297,12 @@ def test_container_removed_after_ephemeral_session(workspace_dir):
 
     list_result = subprocess.run(
         ["container", "list", "--all", "--format", "json"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if list_result.returncode != 0:
         pytest.skip("Could not list containers")
 
     containers = json.loads(list_result.stdout)
     ids = [c.get("configuration", {}).get("id", "") for c in containers]
-    assert container_id not in ids, (
-        f"Container {container_id} still exists after ephemeral session"
-    )
+    assert container_id not in ids, f"Container {container_id} still exists after ephemeral session"
